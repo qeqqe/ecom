@@ -9,7 +9,8 @@ const CartSchema = require("./model/CartItems");
 const Items = require("./model/Items");
 app.use(express.json());
 
-const verify = (res, req, next) => {
+const verify = (req, res, next) => {
+  // Fixed parameter order
   try {
     if (!req.headers.authorization) {
       return res
@@ -124,6 +125,40 @@ app.post("/add-item", verify, async (req, res) => {
     return res.status(500).json({
       success: false,
       error: "Error adding item to cart",
+    });
+  }
+});
+
+app.post("/remove-item", verify, async (req, res) => {
+  try {
+    const { itemId } = req.body;
+    const username = req.user.username;
+
+    const user = await User.findOne({ username });
+    if (!user) {
+      return res.status(404).json({ success: false, error: "User not found" });
+    }
+
+    const item = await Items.findById(itemId);
+    if (!item) {
+      return res.status(404).json({ success: false, error: "Item not found" });
+    }
+
+    let cart = await CartItems.findOne({ username: user._id });
+    if (!cart) {
+      return res.status(404).json({ success: false, error: "Cart not found" });
+    }
+
+    await cart.removeItem(itemId);
+
+    return res.status(200).json({
+      success: true,
+      message: "Item removed from cart successfully",
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      error: "Error removing item from cart",
     });
   }
 });
