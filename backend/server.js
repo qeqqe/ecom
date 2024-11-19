@@ -3,14 +3,15 @@ const app = express();
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
 require("dotenv").config();
-const SECRET_KEY = process.env.SECRET_KEY;
 const User = require("./model/User");
 const CartSchema = require("./model/CartItems");
 const Items = require("./model/Items");
 app.use(express.json());
+const ConnectDB = require("./ConnectDB");
 
+ConnectDB();
+const SECRET_KEY = process.env.SECRET_KEY;
 const verify = (req, res, next) => {
-  // Fixed parameter order
   try {
     if (!req.headers.authorization) {
       return res
@@ -39,7 +40,7 @@ const verify = (req, res, next) => {
   }
 };
 
-app.post("/login", verify, async (req, res) => {
+app.post("/login", async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) {
     return res
@@ -60,12 +61,13 @@ app.post("/login", verify, async (req, res) => {
       { expiresIn: "1h" }
     );
     return res
-      .status(201)
+      .status(200)
       .json({ success: true, message: "successfully logged in", token });
   } catch (err) {
-    return res
-      .status(500)
-      .json({ success: false, error: "an error occured on the server side" });
+    return res.status(500).json({
+      success: false,
+      error: `an error occured on the server side ${err}`,
+    });
   }
 });
 
@@ -124,7 +126,7 @@ app.post("/add-item", verify, async (req, res) => {
   } catch (error) {
     return res.status(500).json({
       success: false,
-      error: "Error adding item to cart",
+      error: `Error adding item to cart ${error}`,
     });
   }
 });
@@ -160,6 +162,31 @@ app.post("/remove-item", verify, async (req, res) => {
       success: false,
       error: "Error removing item from cart",
     });
+  }
+});
+
+// Add this endpoint to create a test item
+app.post("/create-item", async (req, res) => {
+  try {
+    const item = new Items({
+      name: "Test Item",
+      mrp: 100,
+      discount: 10,
+    });
+    await item.save();
+    res.status(201).json({ success: true, item });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Add this endpoint to get all items
+app.get("/items", async (req, res) => {
+  try {
+    const items = await Items.find();
+    res.status(200).json({ success: true, items });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 

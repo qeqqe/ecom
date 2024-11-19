@@ -1,0 +1,54 @@
+### Register a new user
+POST http://localhost:3001/register
+Content-Type: application/json
+
+{
+    "username": "testuser",
+    "email": "test@example.com",
+    "password": "password123"
+}
+
+### Login
+POST http://localhost:3001/login
+Content-Type: application/json
+
+{
+    "email": "test@example.com",
+    "password": "password123"
+}
+
+### Add item to cart (Replace TOKEN and ITEM_ID with actual values)
+POST http://localhost:3001/add-item
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6InRlc3R1c2VyIiwiZW1haWwiOiJ0ZXN0QGV4YW1wbGUuY29tIiwiaWF0IjoxNzMyMDM5NDgyLCJleHAiOjE3MzIwNDMwODJ9._b57awUPugG3GFVaCEY5vzQ6evFbO9O7tzmEhiE63Eg
+Content-Type: application/json
+
+{
+    "itemId": "1"
+}
+
+### Remove item from cart (Replace TOKEN and ITEM_ID with actual values)
+POST http://localhost:3001/remove-item
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6InRlc3R1c2VyIiwiZW1haWwiOiJ0ZXN0QGV4YW1wbGUuY29tIiwiaWF0IjoxNzMyMDM5NDgyLCJleHAiOjE3MzIwNDMwODJ9._b57awUPugG3GFVaCEY5vzQ6evFbO9O7tzmEhiE63Eg
+Content-Type: application/json
+
+{
+    "itemId": "1234"
+}
+
+### Create a test item
+POST http://localhost:3001/create-item
+Content-Type: application/json
+
+{}
+
+### Get all items
+GET http://localhost:3001/items
+
+### Add item to cart (Update ITEM_ID with an ID from the /items response)
+POST http://localhost:3001/add-item
+Authorization: Bearer YOUR_TOKEN_HERE
+Content-Type: application/json
+
+{
+    "itemId": "PASTE_ACTUAL_ITEM_ID_HERE"
+}
