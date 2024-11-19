@@ -1,186 +1,173 @@
 const express = require("express");
-const app = express();
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
 require("dotenv").config();
 const User = require("./model/User");
-const CartSchema = require("./model/CartItems");
+const CartItems = require("./model/CartItems");
 const Items = require("./model/Items");
-app.use(express.json());
-const ConnectDB = require("./ConnectDB");
+const mongoose = require("mongoose");
 
-ConnectDB();
-const SECRET_KEY = process.env.SECRET_KEY;
-const verify = (req, res, next) => {
+const app = express();
+app.use(express.json());
+
+const MONGODB_URI =
+  process.env.MONGODB_URI || "mongodb://localhost:27017/ecommerce";
+
+mongoose
+  .connect(MONGODB_URI)
+  .then(() => console.log("Connected to MongoDB at", MONGODB_URI))
+  .catch((err) => console.error("MongoDB connection error:", err));
+
+const authenticateToken = async (req, res, next) => {
   try {
-    if (!req.headers.authorization) {
-      return res
-        .status(404)
-        .json({ success: false, error: "token not found login again!" });
-    }
-    const token = req.headers.authorization.split(" ")[1];
+    const authHeader = req.headers.authorization;
+    const token = authHeader && authHeader.split(" ")[1];
+
     if (!token) {
       return res
-        .status(404)
-        .json({ success: false, error: "token not found login again!" });
+        .status(401)
+        .json({ success: false, error: "Authentication required" });
     }
-    const decoded = jwt.verify(token, SECRET_KEY);
-    req.user = {
-      username: decoded.username,
-      email: decoded.email,
-    };
+
+    const decoded = jwt.verify(token, process.env.SECRET_KEY);
+    const user = await User.findOne({ username: decoded.username });
+
+    if (!user) {
+      return res.status(404).json({ success: false, error: "User not found" });
+    }
+
+    req.user = user;
     next();
   } catch (error) {
     if (error.name === "TokenExpiredError") {
-      return res.status(401).json({
-        success: false,
-        message: "Token has expired brah",
-      });
+      return res.status(401).json({ success: false, error: "Token expired" });
     }
+    return res.status(403).json({ success: false, error: "Invalid token" });
   }
 };
 
-app.post("/login", async (req, res) => {
-  const { email, password } = req.body;
-  if (!email || !password) {
-    return res
-      .status(403)
-      .json({ success: false, error: "Enter all the credentials" });
-  }
-  try {
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(404).json({ success: false, error: "email not found" });
-    }
-    if (!(await bcrypt.compare(password, user.password))) {
-      return res.status(400).json({ error: "incorrect password" });
-    }
-    const token = jwt.sign(
-      { username: user.username, email: user.email },
-      SECRET_KEY,
-      { expiresIn: "1h" }
-    );
-    return res
-      .status(200)
-      .json({ success: true, message: "successfully logged in", token });
-  } catch (err) {
-    return res.status(500).json({
-      success: false,
-      error: `an error occured on the server side ${err}`,
-    });
-  }
-});
-
 app.post("/register", async (req, res) => {
-  const { username, email, password } = req.body;
-  if (!username || !email || !password) {
-    return res
-      .status(403)
-      .json({ success: false, error: "Enter all the credentials" });
-  }
   try {
+    const { username, email, password } = req.body;
+
+    if (!username || !email || !password) {
+      return res
+        .status(400)
+        .json({ success: false, error: "All fields are required" });
+    }
+
+    const existingUser = await User.findOne({ $or: [{ email }, { username }] });
+    if (existingUser) {
+      return res
+        .status(409)
+        .json({ success: false, error: "User already exists" });
+    }
+
     const hashedPassword = await bcrypt.hash(password, 10);
-    const user = new User({
+    const user = await User.create({
       username,
       email,
       password: hashedPassword,
     });
-    await user.save();
-    return res.status(201).json({ message: "successfully created an accound" });
-  } catch (err) {
-    return res
-      .status(500)
-      .json({ success: false, error: `new error: ${err} ` });
+    await CartItems.create({ userId: user._id, items: [] });
+
+    res
+      .status(201)
+      .json({ success: true, message: "Account created successfully" });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
-app.post("/add-item", verify, async (req, res) => {
+app.post("/login", async (req, res) => {
   try {
-    const { itemId } = req.body;
-    const username = req.user.username;
+    const { email, password } = req.body;
 
-    const user = await User.findOne({ username });
-    if (!user) {
-      return res.status(404).json({ success: false, error: "User not found" });
+    if (!email || !password) {
+      return res
+        .status(400)
+        .json({ success: false, error: "All fields are required" });
     }
 
+    const user = await User.findOne({ email });
+    if (!user || !(await bcrypt.compare(password, user.password))) {
+      return res
+        .status(401)
+        .json({ success: false, error: "Invalid credentials" });
+    }
+
+    const token = jwt.sign(
+      { userId: user._id, username: user.username },
+      process.env.SECRET_KEY,
+      { expiresIn: "1h" }
+    );
+
+    res.status(200).json({ success: true, token });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post("/cart/add", authenticateToken, async (req, res) => {
+  try {
+    const { itemId } = req.body;
     const item = await Items.findById(itemId);
+
     if (!item) {
       return res.status(404).json({ success: false, error: "Item not found" });
     }
 
-    let cart = await CartItems.findOne({ username: user._id });
-    if (!cart) {
-      cart = new CartItems({
-        username: user._id,
-        items: [],
-      });
+    if (item.stock < 1) {
+      return res
+        .status(400)
+        .json({ success: false, error: "Item out of stock" });
     }
 
+    let cart = await CartItems.findOne({ userId: req.user._id });
     await cart.addItem(itemId);
 
-    return res.status(200).json({
-      success: true,
-      message: "Item added to cart successfully",
-    });
+    res.status(200).json({ success: true, message: "Item added to cart" });
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      error: `Error adding item to cart ${error}`,
-    });
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
-app.post("/remove-item", verify, async (req, res) => {
+app.post("/cart/remove", authenticateToken, async (req, res) => {
   try {
     const { itemId } = req.body;
-    const username = req.user.username;
+    let cart = await CartItems.findOne({ userId: req.user._id });
 
-    const user = await User.findOne({ username });
-    if (!user) {
-      return res.status(404).json({ success: false, error: "User not found" });
-    }
-
-    const item = await Items.findById(itemId);
-    if (!item) {
-      return res.status(404).json({ success: false, error: "Item not found" });
-    }
-
-    let cart = await CartItems.findOne({ username: user._id });
     if (!cart) {
       return res.status(404).json({ success: false, error: "Cart not found" });
     }
 
     await cart.removeItem(itemId);
-
-    return res.status(200).json({
-      success: true,
-      message: "Item removed from cart successfully",
-    });
+    res.status(200).json({ success: true, message: "Item removed from cart" });
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      error: "Error removing item from cart",
-    });
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// Add this endpoint to create a test item
-app.post("/create-item", async (req, res) => {
+app.get("/cart", authenticateToken, async (req, res) => {
   try {
-    const item = new Items({
-      name: "Test Item",
-      mrp: 100,
-      discount: 10,
-    });
-    await item.save();
+    const cart = await CartItems.findOne({ userId: req.user._id }).populate(
+      "items.itemId"
+    );
+    res.status(200).json({ success: true, cart });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post("/items", authenticateToken, async (req, res) => {
+  try {
+    const item = await Items.create(req.body);
     res.status(201).json({ success: true, item });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// Add this endpoint to get all items
 app.get("/items", async (req, res) => {
   try {
     const items = await Items.find();
@@ -190,6 +177,5 @@ app.get("/items", async (req, res) => {
   }
 });
 
-app.listen(3001, () => {
-  console.log(`server running at port 3001`);
-});
+const PORT = process.env.PORT || 3001;
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

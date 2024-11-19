@@ -19,7 +19,7 @@ Content-Type: application/json
 
 ### Add item to cart (Replace TOKEN and ITEM_ID with actual values)
 POST http://localhost:3001/add-item
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6InRlc3R1c2VyIiwiZW1haWwiOiJ0ZXN0QGV4YW1wbGUuY29tIiwiaWF0IjoxNzMyMDM5NDgyLCJleHAiOjE3MzIwNDMwODJ9._b57awUPugG3GFVaCEY5vzQ6evFbO9O7tzmEhiE63Eg
+Authorization: Bearer  
 Content-Type: application/json
 
 {
@@ -28,11 +28,11 @@ Content-Type: application/json
 
 ### Remove item from cart (Replace TOKEN and ITEM_ID with actual values)
 POST http://localhost:3001/remove-item
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6InRlc3R1c2VyIiwiZW1haWwiOiJ0ZXN0QGV4YW1wbGUuY29tIiwiaWF0IjoxNzMyMDM5NDgyLCJleHAiOjE3MzIwNDMwODJ9._b57awUPugG3GFVaCEY5vzQ6evFbO9O7tzmEhiE63Eg
+Authorization: Bearer  
 Content-Type: application/json
 
 {
-    "itemId": "1234"
+    "itemId": "1"
 }
 
 ### Create a test item
