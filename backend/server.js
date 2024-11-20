@@ -1,4 +1,5 @@
 const express = require("express");
+const cors = require("cors"); // Add this at the top with other imports
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
 require("dotenv").config();
@@ -8,6 +9,7 @@ const Items = require("./model/Items");
 const mongoose = require("mongoose");
 
 const app = express();
+app.use(cors()); // Add this before other middleware
 app.use(express.json());
 
 const MONGODB_URI =
